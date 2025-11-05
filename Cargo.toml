@@ -1,0 +1,11 @@
+[package]
+name = "bound"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name <you@example.com>"]
+description = "Recursive file aggregator with language-aware dependency resolution and clipboard support"
+license = "MIT"
+
+[dependencies]
+regex = "1.10"
+arboard = "3.6"
