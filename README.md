@@ -1,6 +1,3 @@
-Here is the content formatted as a single `.md` file.
-
-````markdown
 # bound 📦✨
 
 **bound** is a Rust CLI tool for recursively aggregating file contents from directories.  
@@ -34,7 +31,7 @@ Supports language filtering, dependency resolution, token/size/depth limits, cli
 
 Requires **Rust >= 1.70**.
 
-```bash
+``` bash
 git clone [https://github.com/](https://github.com/)<your-username>/bound.git
 cd bound
 cargo build --release
