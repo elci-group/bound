@@ -2,11 +2,12 @@
 //! Placeholder for Furnace integration: richer contextual analysis of files.
 
 use std::path::Path;
+use serde::Serialize;
 use crate::expandable::{ExpandableBlock, wrap_expandable};
 use crate::metadata::FileMetadata;
 
 /// Represents a structured Furnace report
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct FurnaceReport {
     pub file_meta: FileMetadata,
     pub notes: Vec<String>,

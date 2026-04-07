@@ -20,8 +20,22 @@ use metadata::{collect_metadata, FileMetadata};
 use tree::generate_tree;
 use telemetry::Telemetry;
 use logging::{Logger, LogLevel};
-use expandable::{wrap_expandable};
-use furnace::{analyze_file};
+use expandable::{wrap_expandable, ExpandableBlock};
+use furnace::{analyze_file, FurnaceReport};
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct OutputJson {
+    tree: Option<String>,
+    files: Vec<FileJson>,
+}
+
+#[derive(Serialize)]
+struct FileJson {
+    metadata: Option<FileMetadata>,
+    content: Option<String>,
+    furnace_report: Option<FurnaceReport>,
+}
 
 static REF_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
     vec![
@@ -75,6 +89,10 @@ struct Args {
     /// Enable Furnace analysis
     #[arg(long)]
     furnace: bool,
+
+    /// Output JSON format
+    #[arg(long)]
+    json: bool,
 }
 
 fn parse_filter(filter: Option<&str>) -> Result<(Option<String>, bool), String> {
@@ -144,12 +162,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     sorted_files.sort();
 
     let mut aggregated = String::new();
+    let mut json_output = if args.json {
+        Some(OutputJson {
+            tree: None,
+            files: Vec::new(),
+        })
+    } else {
+        None
+    };
 
     // --- File tree ---
     if args.tree && sorted_files.len() > 1 {
         let tree_str = generate_tree(&root_dir, &sorted_files);
-        aggregated.push_str(&wrap_expandable("tree", &tree_str));
-        aggregated.push_str("\n\n");
+        if let Some(ref mut j) = json_output {
+            j.tree = Some(tree_str);
+        } else {
+            aggregated.push_str(&wrap_expandable("tree", &tree_str));
+            aggregated.push_str("\n\n");
+        }
     }
 
     // --- Process files ---
@@ -183,19 +213,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
 
-        file_block.push_str(&processed_content);
-        file_block.push_str("\n\n");
+        let mut file_json = if args.json {
+            Some(FileJson {
+                metadata: meta.clone(),
+                content: Some(processed_content.clone()),
+                furnace_report: None,
+            })
+        } else {
+            None
+        };
+
+        if !args.json {
+            file_block.push_str(&processed_content);
+            file_block.push_str("\n\n");
+        }
 
         // Furnace analysis
         if args.furnace {
             if let Some(ref m) = meta {
                 let report = analyze_file(path, m);
-                file_block.push_str(&report.render());
-                file_block.push_str("\n\n");
+                if let Some(ref mut j) = file_json {
+                    j.furnace_report = Some(report);
+                } else {
+                    file_block.push_str(&report.render());
+                    file_block.push_str("\n\n");
+                }
             }
         }
 
-        aggregated.push_str(&wrap_expandable("file", &file_block));
+        if let Some(j) = file_json {
+            json_output.as_mut().unwrap().files.push(j);
+        } else {
+            aggregated.push_str(&wrap_expandable("file", &file_block));
+        }
 
         telemetry.files_processed += 1;
         telemetry.bytes_read += content.len();
@@ -204,6 +254,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         if telemetry.files_processed % 10 == 0 || telemetry.files_processed == total_files {
             logger.info(&telemetry.report(total_files));
         }
+    }
+
+    if args.json {
+        aggregated = serde_json::to_string_pretty(&json_output.unwrap())?;
     }
 
     // --- Output ---

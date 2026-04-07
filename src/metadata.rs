@@ -6,7 +6,9 @@ use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[derive(Debug, Clone)]
+use serde::Serialize;
+
+#[derive(Debug, Clone, Serialize)]
 pub struct FileMetadata {
     pub relative_path: String,
     pub size_bytes: u64,

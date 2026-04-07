@@ -2,8 +2,10 @@
 //! Provides helper functions to wrap content in expandable{} blocks.
 
 use std::collections::HashMap;
+use serde::Serialize;
 
 /// Represents a generic expandable block
+#[derive(Debug, Clone, Serialize)]
 pub struct ExpandableBlock {
     pub tag: String,
     pub attributes: HashMap<String, String>,
