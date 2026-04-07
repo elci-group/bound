@@ -1,0 +1,17 @@
+
+[package]
+name = "bound"
+version = "0.1.0"
+edition = "2021"
+authors = ["Rory Spring-Vanhorne <rory.spring@icloud.com>"]
+description = "Recursive file aggregator with language-aware dependency resolution and clipboard support"
+license = "MIT"
+
+[dependencies]
+regex = "1.10"
+arboard = "3.6"
+once_cell = "1.21.0"
+clap = { version = "4.4", features = ["derive"] }
+ignore = "0.4"
+sha2 = "0.10"
+colored = "2"
