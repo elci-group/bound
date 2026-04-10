@@ -73,10 +73,10 @@ bound [rs] .
 bound {.py} ./my-project
 
 # Output to file instead of clipboard
-bound [.md] --out documentation.txt
+bound [.md] > documentation.txt
 
 # Include metadata and file tree
-bound [.rs] --meta --tree --out codebase.txt
+bound [.rs] --meta --tree > codebase.txt
 ```
 
 ### Filter Syntax
@@ -110,7 +110,7 @@ bound [.rs] --meta --tree
 
 **JSON:**
 ```bash
-bound [.rs] --json --out output.json
+bound [.rs] --json > output.json
 ```
 
 JSON structure:
