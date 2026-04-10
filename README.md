@@ -4,6 +4,19 @@
 
 ---
 
+## Demo
+
+### Basic Usage
+![Basic Usage](assets/demos/basic.gif)
+
+### Filter Syntax ([rs] vs [.rs])
+![Filter Syntax](assets/demos/filter.gif)
+
+### JSON Output
+![JSON Output](assets/demos/json.gif)
+
+---
+
 ## Features
 
 - **Recursive directory traversal** with `.boundignore` support
