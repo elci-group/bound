@@ -1,0 +1,6 @@
+{
+  "status": "Committing",
+  "last_version": null,
+  "last_action_time": "2026-04-10T13:48:10.911802470Z",
+  "last_error": "error: key with no value, expected `=`\n --> Cargo.toml:1:9\n  |\n1 | <<<<<<< HEAD\n  |         ^"
+}

@@ -1,0 +1,325 @@
+use std::collections::{HashSet, VecDeque};
+use std::env;
+use std::fs::{self, File};
+use std::io::{self, Read, Write};
+use std::path::{Path, PathBuf};
+use std::time::{Instant, Duration};
+
+use arboard::Clipboard;
+use clap::Parser;
+use ignore::WalkBuilder;
+use once_cell::sync::Lazy;
+use regex::Regex;
+
+// --- Performance: Compile Regex patterns only once ---
+static REF_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
+    vec![
+        // Python: import foo, from foo import bar
+        Regex::new(r"(?m)^\s*import\s+([a-zA-Z0-9_\.]+)").unwrap(),
+        Regex::new(r"(?m)^\s*from\s+([a-zA-Z0-9_\.]+)\s+import").unwrap(),
+        // JS/TS: import ... from "foo", require("foo")
+        Regex::new(r#"require\(['"](.+?)['"]\)"#).unwrap(),
+        Regex::new(r#"(?m)^\s*import\s+.*\s+from\s+['"](.+?)['"]"#).unwrap(),
+        // C/C++: #include "foo.h"
+        Regex::new(r#"(?m)^\s*#include\s*["<](.+?)["<]"#).unwrap(),
+    ]
+});
+
+/// Telemetry struct for tracking progress
+struct Telemetry {
+    files_processed: usize,
+    bytes_read: usize,
+    tokens_aggregated: usize,
+    start_time: Instant,
+}
+
+impl Telemetry {
+    fn new() -> Self {
+        Telemetry {
+            files_processed: 0,
+            bytes_read: 0,
+            tokens_aggregated: 0,
+            start_time: Instant::now(),
+        }
+    }
+
+    fn elapsed(&self) -> Duration {
+        self.start_time.elapsed()
+    }
+
+    fn ebt(&self, total_files: usize) -> Option<Duration> {
+        if self.files_processed == 0 || self.files_processed >= total_files {
+            return None;
+        }
+        let remaining_files = total_files.saturating_sub(self.files_processed);
+        let avg_per_file = self.elapsed().as_secs_f64() / self.files_processed as f64;
+        Some(Duration::from_secs_f64(avg_per_file * remaining_files as f64))
+    }
+
+    fn report(&self, total_files: usize) {
+        let ebt_str = self.ebt(total_files)
+            .map(|d| format!("{:.1}s", d.as_secs_f64()))
+            .unwrap_or("--".to_string());
+
+        let progress = if total_files > 0 {
+            let percent = (self.files_processed as f64 / total_files as f64) * 100.0;
+            format!("{:>3.0}%", percent)
+        } else {
+            "--%".to_string()
+        };
+
+        // Use stderr for progress reports so stdout can be redirected
+        eprintln!(
+            "[{} | Files: {} | Bytes: {} | Tokens: {} | EBT: {}]",
+            progress,
+            self.files_processed,
+            self.bytes_read,
+            self.tokens_aggregated,
+            ebt_str
+        );
+    }
+}
+
+/// Rust-based CLI for recursive file aggregation with filtering.
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// Language filter: [.ext] for extension, {.ext} for extension + dependencies
+    #[arg()]
+    filter: Option<String>,
+
+    /// Target directory to scan (defaults to current dir)
+    #[arg(default_value = ".")]
+    directory: PathBuf,
+
+    /// Token limit (per file)
+    #[arg(short = 't', long, value_name = "N")]
+    token_limit: Option<usize>,
+
+    /// Size limit in bytes (per file)
+    #[arg(short = 's', long, value_name = "N")]
+    size_limit: Option<usize>,
+
+    /// Depth limit for directory traversal
+    #[arg(short = 'd', long, value_name = "N")]
+    depth_limit: Option<usize>,
+
+    /// Output file (defaults to clipboard)
+    #[arg(long, value_name = "FILE")]
+    out: Option<PathBuf>,
+}
+
+/// Parses the filter string into (extension, dependency_aware)
+fn parse_filter(filter: Option<&str>) -> Result<(Option<String>, bool), String> {
+    match filter {
+        None => Ok((None, false)),
+        Some(f) if f.starts_with('[') && f.ends_with(']') => {
+            Ok((Some(f[1..f.len() - 1].to_string()), false))
+        }
+        Some(f) if f.starts_with('{') && f.ends_with('}') => {
+            Ok((Some(f[1..f.len() - 1].to_string()), true))
+        }
+        Some(f) => Err(format!("Invalid filter format: '{}'. Use [.ext] or {{.ext}}", f)),
+    }
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+    let (filter_ext, dep_aware) = parse_filter(args.filter.as_deref())?;
+
+    let mut telemetry = Telemetry::new();
+    let root_dir = fs::canonicalize(&args.directory)?;
+
+    // --- 1. Build File List using `ignore` crate ---
+    let mut walker_builder = WalkBuilder::new(&root_dir);
+    walker_builder.add_custom_ignore_filename(".boundignore");
+    if let Some(dl) = args.depth_limit {
+        walker_builder.max_depth(dl);
+    }
+
+    // Get all files respecting .gitignore, depth, etc.
+    let all_files: Vec<PathBuf> = walker_builder.build()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
+        .map(|e| e.into_path())
+        .collect();
+
+    let mut files_to_process = HashSet::new();
+    let mut files_to_scan_deps = VecDeque::new();
+
+    // --- 2. Apply Language Filter ---
+    if let Some(ext) = &filter_ext {
+        for path in all_files {
+            if path.extension().and_then(|s| s.to_str()) == Some(ext) {
+                files_to_process.insert(path.clone());
+                if dep_aware {
+                    files_to_scan_deps.push_back(path);
+                }
+            }
+        }
+    } else {
+        // No filter, process all non-ignored files
+        files_to_process.extend(all_files);
+    }
+
+    // --- 3. Resolve Dependencies (if {.ext} used) ---
+    if dep_aware {
+        let mut visited_for_deps = HashSet::new();
+        while let Some(path) = files_to_scan_deps.pop_front() {
+            if !visited_for_deps.insert(path.clone()) {
+                continue;
+            }
+
+            for ref_str in parse_references_generic(&path)? {
+                let candidate = resolve_ref_path(&path, &ref_str, &root_dir);
+                if candidate.exists() && !files_to_process.contains(&candidate) {
+                    files_to_process.insert(candidate.clone());
+                    // Also scan dependencies of dependencies
+                    files_to_scan_deps.push_back(candidate); 
+                }
+            }
+        }
+    }
+    
+    // --- 4. Process and Aggregate Files ---
+    let mut aggregated = String::new();
+    let total_files = files_to_process.len();
+    
+    // Sort files for consistent output
+    let mut sorted_files: Vec<PathBuf> = files_to_process.into_iter().collect();
+    sorted_files.sort();
+
+    for path in sorted_files {
+        match fs::read_to_string(&path) {
+            Ok(content) => {
+                process_file(
+                    &mut aggregated,
+                    &content,
+                    &mut telemetry,
+                    args.token_limit,
+                    args.size_limit,
+                );
+                telemetry.files_processed += 1;
+
+                if telemetry.files_processed % 10 == 0 || telemetry.files_processed == total_files {
+                    telemetry.report(total_files);
+                }
+            }
+            Err(e) => eprintln!("Warning: Could not read file {:?}: {}", path, e),
+        }
+    }
+
+    // --- 5. Output ---
+    if let Some(file_path) = args.out {
+        let mut f = File::create(&file_path)?;
+        writeln!(f, "{}", aggregated)?;
+        eprintln!("Output written to {:?}", file_path);
+    } else {
+        let mut clipboard = Clipboard::new()?;
+        clipboard.set_text(aggregated)?;
+        eprintln!("Output copied to clipboard.");
+    }
+
+    Ok(())
+}
+
+/// Process a single file's content
+fn process_file(
+    aggregated: &mut String,
+    content: &str,
+    telemetry: &mut Telemetry,
+    token_limit: Option<usize>,
+    size_limit: Option<usize>,
+) {
+    telemetry.bytes_read += content.len();
+
+    let (token_count, processed_content) = if let Some(tl) = token_limit {
+        let mut tokens = content.split_whitespace();
+        let mut limited_content = String::new();
+        let mut count = 0;
+        while let Some(token) = tokens.next() {
+            if count >= tl { break; }
+            limited_content.push_str(token);
+            limited_content.push(' ');
+            count += 1;
+        }
+        // Count total tokens for telemetry, even if we truncate
+        let total_tokens = count + tokens.count();
+        (total_tokens, limited_content) // Now we own the new string
+    } else {
+        (content.split_whitespace().count(), content.to_string())
+    };
+
+    telemetry.tokens_aggregated += token_count;
+
+    // Apply size limit (on the *potentially* token-truncated content)
+    let mut final_content = processed_content;
+    if let Some(sl) = size_limit {
+        if final_content.len() > sl {
+            final_content.truncate(sl);
+            // Note: This truncation is naive and may cut mid-char.
+            // For this utility, it's likely acceptable.
+        }
+    }
+
+    aggregated.push_str(&final_content);
+    aggregated.push_str("\n\n"); // Add spacing between files
+}
+
+/// Parse references in code (Python, JS, C/C++)
+fn parse_references_generic(path: &Path) -> io::Result<Vec<String>> {
+    let content = fs::read_to_string(path)?;
+    let mut references = Vec::new();
+
+    let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
+
+    for re in REF_PATTERNS.iter() {
+        for cap in re.captures_iter(&content) {
+            if let Some(m) = cap.get(1) {
+                let mut r = m.as_str().to_string();
+                
+                // Handle Python/JS module paths
+                if ext == "py" || ext == "js" || ext == "ts" {
+                    r = r.replace('.', "/");
+                }
+                
+                // Attempt to add an extension if one isn't present
+                if !r.contains('.') {
+                    r = format!("{}.{}", r, ext);
+                }
+                references.push(r);
+            }
+        }
+    }
+    Ok(references)
+}
+
+/// Tries to resolve a reference string (e.g., "./foo/bar.rs") from a source file
+fn resolve_ref_path(source_path: &Path, ref_str: &str, root_dir: &Path) -> PathBuf {
+    let base_dir = source_path.parent().unwrap_or(root_dir);
+    let mut candidate = base_dir.join(ref_str);
+    
+    // Clean up path (e.g., remove "./" or "../")
+    if let Ok(canon) = fs::canonicalize(&candidate) {
+        candidate = canon;
+    } else {
+         // Path might not exist, so just normalize
+         let mut components = Vec::new();
+         for comp in candidate.components() {
+             match comp {
+                 std::path::Component::Normal(c) => components.push(c),
+                 std::path::Component::ParentDir => { components.pop(); },
+                 _ => {}
+             }
+         }
+         candidate = root_dir.join(components.iter().collect::<PathBuf>());
+    }
+
+    // Ensure the path stays within the root directory
+    if candidate.strip_prefix(root_dir).is_ok() {
+        candidate
+    } else {
+        // If it escapes root, return an unlikely-to-exist path
+        root_dir.join(ref_str) 
+    }
+}

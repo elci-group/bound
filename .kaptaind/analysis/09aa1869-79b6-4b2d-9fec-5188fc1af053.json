@@ -1,0 +1,70 @@
+{
+  "cluster_id": "09aa1869-79b6-4b2d-9fec-5188fc1af053",
+  "version": "0.1.1",
+  "bump": "Patch",
+  "event_count": 12,
+  "started_at": "2026-04-10T13:48:34.865912643Z",
+  "ended_at": "2026-04-10T13:48:34.865961672Z",
+  "diff": {
+    "structural": 0.31563252,
+    "api": 0.0,
+    "deps": 0.6388889,
+    "runtime": 0.0,
+    "api_breaking": false,
+    "api_added": false,
+    "touched_paths": 3,
+    "api_touches": 0,
+    "api_signatures": 0,
+    "dependency_manifests": 4,
+    "dependency_nodes": 10,
+    "dependency_edges": 9,
+    "runtime_paths": 0,
+    "bundle": 0.0,
+    "parse_metadata": [
+      {
+        "file": "src/main.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      },
+      {
+        "file": "src/main.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      },
+      {
+        "file": "src/main.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      },
+      {
+        "file": "src/main.rs",
+        "lang": "Rust",
+        "version": "2021",
+        "parser_used": "Ast",
+        "fallback_used": false,
+        "confidence": 0.8075,
+        "version_match": "inferred"
+      }
+    ],
+    "ast_cache_hits": 3,
+    "ast_cache_misses": 1,
+    "ast_cache_entries": 1
+  },
+  "weight": {
+    "score": 0.23824917,
+    "api_breaking": false,
+    "api_added": false
+  }
+}

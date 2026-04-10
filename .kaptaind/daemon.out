@@ -1,0 +1,13 @@
+kaptaind started in the background.
+[2m2026-04-10T13:35:53.682748Z[0m [32m INFO[0m [2mkaptaind[0m[2m:[0m Starting kaptaind
+[2m2026-04-10T13:35:53.682808Z[0m [32m INFO[0m [2mkaptaind[0m[2m:[0m Watching repository at: /home/adminx/bound/
+[2m2026-04-10T13:40:00.236259Z[0m [32m INFO[0m [2mkaptaind::daemon::scheduler[0m[2m:[0m cluster window expired by timeout [3mcluster_id[0m[2m=[0maea9989e-c559-4d05-bad2-2d3cc493c906
+[2m2026-04-10T13:40:21.595372Z[0m [32m INFO[0m [2mkaptaind::daemon::scheduler[0m[2m:[0m cluster window expired by timeout [3mcluster_id[0m[2m=[0m543e93e4-2a9e-4b48-84b7-d5484f47f592
+[2m2026-04-10T13:48:34.053681Z[0m [32m INFO[0m [2mkaptaind::daemon::scheduler[0m[2m:[0m cluster window expired by timeout [3mcluster_id[0m[2m=[0mef6e812b-89bf-44cd-8713-7e12e97001b5
+[2m2026-04-10T13:48:34.385469Z[0m [33m WARN[0m [2mkaptaind::daemon::scheduler[0m[2m:[0m test hook failed; skipping automation [3mcode[0m[2m=[0mSome(101) [3mstderr[0m[2m=[0merror: key with no value, expected `=`
+ --> Cargo.toml:1:9
+  |
+1 | <<<<<<< HEAD
+  |         ^
+[2m2026-04-10T13:48:41.545923Z[0m [32m INFO[0m [2mkaptaind::daemon::scheduler[0m[2m:[0m cluster window expired by timeout [3mcluster_id[0m[2m=[0m09aa1869-79b6-4b2d-9fec-5188fc1af053
+[2m2026-04-10T13:49:17.095558Z[0m [32m INFO[0m [2mkaptaind::daemon::scheduler[0m[2m:[0m Token usage and cost tracking [3minput_tokens[0m[2m=[0m13928 [3moutput_tokens[0m[2m=[0m35 [3mmarginal_cost[0m[2m=[0m0.0070165 [3maggregate_cost[0m[2m=[0m0.0070165
