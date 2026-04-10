@@ -23,7 +23,7 @@ Run the built binary with arguments:
 ./target/release/bound [FILTER] [DIRECTORY] [OPTIONS]
 ```
 
-- FILTER: Optional language filter in `[.ext]` (exact extension) or `{.ext}` (extension with dependencies).
+- FILTER: Optional language filter in `[ext]` or `[.ext]` (exact extension) or `{ext}`/`{.ext}` (extension with dependencies). The dot prefix is optional.
 - DIRECTORY: Target directory (defaults to `.`).
 - OPTIONS:
   - `-t, --token-limit <N>`: Token limit per file.
@@ -79,3 +79,5 @@ No test files or #[test] functions observed. Use `cargo test` if tests are added
 - Content truncation applies after reading full file; limits are per-file.
 - Output defaults to clipboard; specify `--out` for file output.
 - Telemetry reports every 10 files or at end.
+- Filter extensions work with or without leading dot: `[rs]` and `[.rs]` are equivalent.
+- Non-UTF-8 files are skipped with a warning instead of causing errors.

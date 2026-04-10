@@ -20,7 +20,7 @@ use metadata::{collect_metadata, FileMetadata};
 use tree::generate_tree;
 use telemetry::Telemetry;
 use logging::{Logger, LogLevel};
-use expandable::{wrap_expandable, ExpandableBlock};
+use expandable::wrap_expandable;
 use furnace::{analyze_file, FurnaceReport};
 use serde::Serialize;
 
@@ -98,8 +98,14 @@ struct Args {
 fn parse_filter(filter: Option<&str>) -> Result<(Option<String>, bool), String> {
     match filter {
         None => Ok((None, false)),
-        Some(f) if f.starts_with('[') && f.ends_with(']') => Ok((Some(f[1..f.len()-1].to_string()), false)),
-        Some(f) if f.starts_with('{') && f.ends_with('}') => Ok((Some(f[1..f.len()-1].to_string()), true)),
+        Some(f) if f.starts_with('[') && f.ends_with(']') => {
+            let ext = f[1..f.len()-1].trim_start_matches('.').to_string();
+            Ok((Some(ext), false))
+        }
+        Some(f) if f.starts_with('{') && f.ends_with('}') => {
+            let ext = f[1..f.len()-1].trim_start_matches('.').to_string();
+            Ok((Some(ext), true))
+        }
         Some(f) => Err(format!("Invalid filter format: '{}'", f)),
     }
 }
@@ -186,12 +192,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let total_files = sorted_files.len();
     for path in &sorted_files {
         let meta = if args.meta {
-            Some(collect_metadata(path, &root_dir, args.meta_hash)?)
+            match collect_metadata(path, &root_dir, args.meta_hash) {
+                Ok(m) => Some(m),
+                Err(e) => {
+                    logger.warn(&format!("Failed to collect metadata for {}: {}", path.display(), e));
+                    None
+                }
+            }
         } else {
             None
         };
 
-        let content = fs::read_to_string(path)?;
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                logger.warn(&format!("Skipping {}: {}", path.display(), e));
+                continue;
+            }
+        };
         let mut file_block = String::new();
 
         if let Some(ref m) = meta {

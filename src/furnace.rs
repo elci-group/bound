@@ -3,7 +3,7 @@
 
 use std::path::Path;
 use serde::Serialize;
-use crate::expandable::{ExpandableBlock, wrap_expandable};
+use crate::expandable::ExpandableBlock;
 use crate::metadata::FileMetadata;
 
 /// Represents a structured Furnace report
