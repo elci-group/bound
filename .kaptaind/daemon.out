@@ -11,3 +11,5 @@ kaptaind started in the background.
   |         ^
 [2m2026-04-10T13:48:41.545923Z[0m [32m INFO[0m [2mkaptaind::daemon::scheduler[0m[2m:[0m cluster window expired by timeout [3mcluster_id[0m[2m=[0m09aa1869-79b6-4b2d-9fec-5188fc1af053
 [2m2026-04-10T13:49:17.095558Z[0m [32m INFO[0m [2mkaptaind::daemon::scheduler[0m[2m:[0m Token usage and cost tracking [3minput_tokens[0m[2m=[0m13928 [3moutput_tokens[0m[2m=[0m35 [3mmarginal_cost[0m[2m=[0m0.0070165 [3maggregate_cost[0m[2m=[0m0.0070165
+[2m2026-04-10T13:49:27.257123Z[0m [32m INFO[0m [2mkaptaind::daemon::scheduler[0m[2m:[0m cluster window expired by timeout [3mcluster_id[0m[2m=[0m025b4782-1838-4fd0-8e80-30e168b7b125
+[2m2026-04-10T13:49:28.393644Z[0m [32m INFO[0m [2mkaptaind::daemon::scheduler[0m[2m:[0m Token usage and cost tracking [3minput_tokens[0m[2m=[0m243 [3moutput_tokens[0m[2m=[0m35 [3mmarginal_cost[0m[2m=[0m0.000174 [3maggregate_cost[0m[2m=[0m0.0071905

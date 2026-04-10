@@ -1,8 +1,8 @@
 {
-  "input_tokens": 13928,
+  "input_tokens": 243,
   "output_tokens": 35,
-  "marginal_cost": 0.0070165,
-  "aggregate_cost": 0.0070165,
+  "marginal_cost": 0.000174,
+  "aggregate_cost": 0.0071905,
   "stability": 0.0,
   "releases": 0,
   "failed_releases": 0,
