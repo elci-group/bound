@@ -1,312 +1,340 @@
-use std::collections::HashSet;
-use std::env;
+use std::collections::{HashSet, VecDeque};
 use std::fs::{self, File};
-use std::io::{self, BufRead, Read, Write};
 use std::path::{Path, PathBuf};
-use std::time::{Instant, Duration};
-use regex::Regex;
+use std::io::Write;
+
 use arboard::Clipboard;
+use clap::Parser;
+use ignore::WalkBuilder;
+use once_cell::sync::Lazy;
+use regex::Regex;
 
-/// Telemetry struct for tracking progress
-struct Telemetry {
-    files_processed: usize,
-    bytes_read: usize,
-    tokens_aggregated: usize,
-    start_time: Instant,
+mod metadata;
+mod tree;
+mod telemetry;
+mod logging;
+mod expandable;
+mod furnace;
+
+use metadata::{collect_metadata, FileMetadata};
+use tree::generate_tree;
+use telemetry::Telemetry;
+use logging::{Logger, LogLevel};
+use expandable::wrap_expandable;
+use furnace::{analyze_file, FurnaceReport};
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct OutputJson {
+    tree: Option<String>,
+    files: Vec<FileJson>,
 }
 
-impl Telemetry {
-    fn new() -> Self {
-        Telemetry {
-            files_processed: 0,
-            bytes_read: 0,
-            tokens_aggregated: 0,
-            start_time: Instant::now(),
+#[derive(Serialize)]
+struct FileJson {
+    metadata: Option<FileMetadata>,
+    content: Option<String>,
+    furnace_report: Option<FurnaceReport>,
+}
+
+static REF_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
+    vec![
+        Regex::new(r"(?m)^\s*import\s+([a-zA-Z0-9_\.]+)").unwrap(),
+        Regex::new(r"(?m)^\s*from\s+([a-zA-Z0-9_\.]+)\s+import").unwrap(),
+        Regex::new(r#"require\(['"](.+?)['"]\)"#).unwrap(),
+        Regex::new(r#"(?m)^\s*import\s+.*\s+from\s+['"](.+?)['"]"#).unwrap(),
+        Regex::new(r#"(?m)^\s*#include\s*["<](.+?)["<]"#).unwrap(),
+    ]
+});
+
+#[derive(Parser, Debug)]
+#[command(version, about)]
+struct Args {
+    /// Language filter [.ext] or {.ext}
+    #[arg()]
+    filter: Option<String>,
+
+    /// Target directory
+    #[arg(default_value = ".")]
+    directory: PathBuf,
+
+    /// Token limit per file
+    #[arg(short = 't', long)]
+    token_limit: Option<usize>,
+
+    /// Size limit per file (bytes)
+    #[arg(short = 's', long)]
+    size_limit: Option<usize>,
+
+    /// Depth limit
+    #[arg(short = 'd', long)]
+    depth_limit: Option<usize>,
+
+    /// Output file (if not given, clipboard)
+    #[arg(long)]
+    out: Option<PathBuf>,
+
+    /// Include metadata headers
+    #[arg(long)]
+    meta: bool,
+
+    /// Include SHA-256 hash in metadata
+    #[arg(long)]
+    meta_hash: bool,
+
+    /// Include file tree
+    #[arg(long)]
+    tree: bool,
+
+    /// Enable Furnace analysis
+    #[arg(long)]
+    furnace: bool,
+
+    /// Output JSON format
+    #[arg(long)]
+    json: bool,
+}
+
+fn parse_filter(filter: Option<&str>) -> Result<(Option<String>, bool), String> {
+    match filter {
+        None => Ok((None, false)),
+        Some(f) if f.starts_with('[') && f.ends_with(']') => {
+            let ext = f[1..f.len()-1].trim_start_matches('.').to_string();
+            Ok((Some(ext), false))
         }
-    }
-
-    fn elapsed(&self) -> Duration {
-        self.start_time.elapsed()
-    }
-
-    fn ebt(&self, total_files: usize) -> Option<Duration> {
-        if self.files_processed == 0 { return None; }
-        let remaining_files = total_files.saturating_sub(self.files_processed);
-        let avg_per_file = self.elapsed().as_secs_f64() / self.files_processed as f64;
-        Some(Duration::from_secs_f64(avg_per_file * remaining_files as f64))
-    }
-
-    fn report(&self, total_files: usize) {
-        let ebt_str = self.ebt(total_files)
-            .map(|d| format!("{:.1}s", d.as_secs_f64()))
-            .unwrap_or("--".to_string());
-
-        let progress = if total_files > 0 {
-            let percent = (self.files_processed as f64 / total_files as f64) * 100.0;
-            format!("{:>3.0}%", percent)
-        } else {
-            "--%".to_string()
-        };
-
-        println!(
-            "[{} | Files: {} | Bytes: {} | Tokens: {} | EBT: {}]",
-            progress,
-            self.files_processed,
-            self.bytes_read,
-            self.tokens_aggregated,
-            ebt_str
-        );
+        Some(f) if f.starts_with('{') && f.ends_with('}') => {
+            let ext = f[1..f.len()-1].trim_start_matches('.').to_string();
+            Ok((Some(ext), true))
+        }
+        Some(f) => Err(format!("Invalid filter format: '{}'", f)),
     }
 }
 
-fn main() -> io::Result<()> {
-    let args: Vec<String> = env::args().collect();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let args = Args::parse();
+    let (filter_ext, dep_aware) = parse_filter(args.filter.as_deref())?;
+    let mut telemetry = Telemetry::new();
+    let root_dir = fs::canonicalize(&args.directory)?;
 
-    if args.len() < 2 {
-        eprintln!("Usage: bound <filter> <directory> [-tl N] [-sl N] [-dl N] [--out <file>]");
-        return Ok(());
+    let logger = Logger::new(LogLevel::Info, None);
+    logger.info(&format!("Scanning directory: {}", root_dir.display()));
+
+    // --- Build file list ---
+    let mut walker = WalkBuilder::new(&root_dir);
+    walker.add_custom_ignore_filename(".boundignore");
+    if let Some(dl) = args.depth_limit {
+        walker.max_depth(Some(dl));
     }
+    let all_files: Vec<PathBuf> = walker.build()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().map_or(false, |ft| ft.is_file()))
+        .map(|e| e.into_path())
+        .collect();
 
-    // Parse language filter and target directory
-    let mut lang_filter: Option<(String, bool)> = None; // (extension, dependency-aware)
-    let target_dir_arg = if args[1].starts_with('[') && args[1].ends_with(']') {
-        lang_filter = Some((args[1][1..args[1].len() - 1].to_string(), false));
-        args.get(2).cloned()
-    } else if args[1].starts_with('{') && args[1].ends_with('}') {
-        lang_filter = Some((args[1][1..args[1].len() - 1].to_string(), true));
-        args.get(2).cloned()
+    let mut files_to_process = HashSet::new();
+    let mut files_to_scan_deps = VecDeque::new();
+
+    // --- Language filter ---
+    if let Some(ext) = &filter_ext {
+        for path in &all_files {
+            if path.extension().and_then(|s| s.to_str()) == Some(ext) {
+                files_to_process.insert(path.clone());
+                if dep_aware {
+                    files_to_scan_deps.push_back(path.clone());
+                }
+            }
+        }
     } else {
-        args.get(1).cloned()
-    };
-
-    let target_dir_string = match target_dir_arg {
-        Some(d) => d,
-        None => { eprintln!("Target directory not specified."); return Ok(()); }
-    };
-    let target_dir = Path::new(&target_dir_string);
-
-    // Parse flags
-    let mut token_limit: Option<usize> = None;
-    let mut size_limit: Option<usize> = None;
-    let mut depth_limit: Option<usize> = None;
-    let mut output_file: Option<String> = None;
-
-    let mut i = if lang_filter.is_some() { 3 } else { 2 };
-    while i < args.len() {
-        match args[i].as_str() {
-            "-tl" => { i += 1; token_limit = args.get(i).and_then(|v| v.parse::<usize>().ok()); },
-            "-sl" => { i += 1; size_limit = args.get(i).and_then(|v| v.parse::<usize>().ok()); },
-            "-dl" => { i += 1; depth_limit = args.get(i).and_then(|v| v.parse::<usize>().ok()); },
-            "--out" => { i += 1; output_file = args.get(i).cloned(); },
-            _ => {}
-        }
-        i += 1;
+        files_to_process.extend(all_files.iter().cloned());
     }
 
-    // Pre-scan total files for accurate EBT
-    let total_files = count_files(target_dir, lang_filter.clone(), depth_limit)?;
+    // --- Resolve dependencies ---
+    if dep_aware {
+        let mut visited = HashSet::new();
+        while let Some(path) = files_to_scan_deps.pop_front() {
+            if !visited.insert(path.clone()) { continue; }
+            for r in parse_references_generic(&path)? {
+                let candidate = resolve_ref_path(&path, &r, &root_dir);
+                if candidate.exists() && !files_to_process.contains(&candidate) {
+                    files_to_process.insert(candidate.clone());
+                    files_to_scan_deps.push_back(candidate);
+                }
+            }
+        }
+    }
+
+    // --- Sort files for consistent output ---
+    let mut sorted_files: Vec<PathBuf> = files_to_process.into_iter().collect();
+    sorted_files.sort();
 
     let mut aggregated = String::new();
-    let mut visited_files = HashSet::new();
-    let mut telemetry = Telemetry::new();
-
-    process_dir(
-        target_dir,
-        0,
-        &mut aggregated,
-        &mut visited_files,
-        lang_filter.clone(),
-        token_limit,
-        size_limit,
-        depth_limit,
-        target_dir,
-        &mut telemetry,
-        total_files,
-    )?;
-
-    if let Some(file_path) = output_file {
-        let mut f = File::create(file_path)?;
-        writeln!(f, "{}", aggregated)?;
-        println!("Output written to file.");
+    let mut json_output = if args.json {
+        Some(OutputJson {
+            tree: None,
+            files: Vec::new(),
+        })
     } else {
-        let mut clipboard = Clipboard::new().expect("Failed to access clipboard");
-        clipboard.set_text(aggregated).expect("Failed to write to clipboard");
-        println!("Output copied to clipboard.");
-    }
+        None
+    };
 
-    Ok(())
-}
-
-/// Recursive processing of directories
-fn process_dir(
-    path: &Path,
-    current_depth: usize,
-    aggregated: &mut String,
-    visited_files: &mut HashSet<PathBuf>,
-    lang_filter: Option<(String, bool)>,
-    token_limit: Option<usize>,
-    size_limit: Option<usize>,
-    depth_limit: Option<usize>,
-    root_dir: &Path,
-    telemetry: &mut Telemetry,
-    total_files: usize,
-) -> io::Result<()> {
-    if let Some(dl) = depth_limit { if current_depth > dl { return Ok(()); } }
-
-    if path.is_dir() {
-        for entry in fs::read_dir(path)? {
-            let entry = entry?;
-            let path = entry.path();
-            process_dir(path.as_path(), current_depth + 1, aggregated, visited_files,
-                lang_filter.clone(), token_limit, size_limit, depth_limit, root_dir,
-                telemetry, total_files)?;
-        }
-    } else if path.is_file() {
-        process_file(path, aggregated, visited_files, lang_filter.clone(),
-            token_limit, size_limit, root_dir, telemetry, total_files)?;
-    }
-
-    Ok(())
-}
-
-/// Process a single file
-fn process_file(
-    path: &Path,
-    aggregated: &mut String,
-    visited_files: &mut HashSet<PathBuf>,
-    lang_filter: Option<(String, bool)>,
-    token_limit: Option<usize>,
-    size_limit: Option<usize>,
-    root_dir: &Path,
-    telemetry: &mut Telemetry,
-    total_files: usize,
-) -> io::Result<()> {
-    if visited_files.contains(path) { return Ok(()); }
-
-    let mut include_file = true;
-    if let Some((ref ext, dep)) = lang_filter {
-        include_file = path.extension()
-                           .and_then(|e| e.to_str())
-                           .map(|e| e == ext)
-                           .unwrap_or(false);
-
-        if dep && include_file {
-            for ref_path in parse_references_generic(path)? {
-                let candidate = path.parent().unwrap_or(root_dir).join(&ref_path);
-                let candidate = canonicalize_path(&candidate, root_dir);
-                if candidate.exists() {
-                    process_file(&candidate, aggregated, visited_files, lang_filter.clone(),
-                                 token_limit, size_limit, root_dir, telemetry, total_files)?;
-                }
-            }
-        }
-    }
-
-    if include_file {
-        let mut file = File::open(path)?;
-        let mut buffer = Vec::new();
-        file.read_to_end(&mut buffer)?;
-        telemetry.bytes_read += buffer.len();
-
-        let mut contents = String::from_utf8_lossy(&buffer).to_string();
-
-        // Token limit handling
-        if let Some(tl) = token_limit {
-            let mut words: Vec<String> = contents.split_whitespace().map(|s| s.to_string()).collect();
-            telemetry.tokens_aggregated += words.len();
-            words.truncate(tl);
-            contents = words.join(" ");
+    // --- File tree ---
+    if args.tree && sorted_files.len() > 1 {
+        let tree_str = generate_tree(&root_dir, &sorted_files);
+        if let Some(ref mut j) = json_output {
+            j.tree = Some(tree_str);
         } else {
-            telemetry.tokens_aggregated += contents.split_whitespace().count();
+            aggregated.push_str(&wrap_expandable("tree", &tree_str));
+            aggregated.push_str("\n\n");
+        }
+    }
+
+    // --- Process files ---
+    let total_files = sorted_files.len();
+    for path in &sorted_files {
+        let meta = if args.meta {
+            match collect_metadata(path, &root_dir, args.meta_hash) {
+                Ok(m) => Some(m),
+                Err(e) => {
+                    logger.warn(&format!("Failed to collect metadata for {}: {}", path.display(), e));
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        let content = match fs::read_to_string(path) {
+            Ok(c) => c,
+            Err(e) => {
+                logger.warn(&format!("Skipping {}: {}", path.display(), e));
+                continue;
+            }
+        };
+        let mut file_block = String::new();
+
+        if let Some(ref m) = meta {
+            file_block.push_str(&wrap_expandable("metadata", &m.to_header()));
         }
 
-        // Size limit
-        if let Some(sl) = size_limit {
-            if contents.len() > sl { contents.truncate(sl); }
+        // Apply token/size limits
+        let mut processed_content = content.clone();
+        if let Some(tl) = args.token_limit {
+            processed_content = processed_content
+                .split_whitespace()
+                .take(tl)
+                .collect::<Vec<&str>>()
+                .join(" ");
+        }
+        if let Some(sl) = args.size_limit {
+            if processed_content.len() > sl {
+                processed_content.truncate(sl);
+            }
         }
 
-        aggregated.push_str(&contents);
-        aggregated.push('\n');
-        visited_files.insert(path.to_path_buf());
+        let mut file_json = if args.json {
+            Some(FileJson {
+                metadata: meta.clone(),
+                content: Some(processed_content.clone()),
+                furnace_report: None,
+            })
+        } else {
+            None
+        };
+
+        if !args.json {
+            file_block.push_str(&processed_content);
+            file_block.push_str("\n\n");
+        }
+
+        // Furnace analysis
+        if args.furnace {
+            if let Some(ref m) = meta {
+                let report = analyze_file(path, m);
+                if let Some(ref mut j) = file_json {
+                    j.furnace_report = Some(report);
+                } else {
+                    file_block.push_str(&report.render());
+                    file_block.push_str("\n\n");
+                }
+            }
+        }
+
+        if let Some(j) = file_json {
+            json_output.as_mut().unwrap().files.push(j);
+        } else {
+            aggregated.push_str(&wrap_expandable("file", &file_block));
+        }
+
         telemetry.files_processed += 1;
+        telemetry.bytes_read += content.len();
+        telemetry.tokens_aggregated += content.split_whitespace().count();
 
-        // Progress update every 10 files or at end
         if telemetry.files_processed % 10 == 0 || telemetry.files_processed == total_files {
-            telemetry.report(total_files);
+            logger.info(&telemetry.report(total_files));
         }
+    }
+
+    if args.json {
+        aggregated = serde_json::to_string_pretty(&json_output.unwrap())?;
+    }
+
+    // --- Output ---
+    if let Some(out_path) = args.out {
+        let mut f = File::create(&out_path)?;
+        writeln!(f, "{}", aggregated)?;
+        logger.info(&format!("Output written to {:?}", out_path));
+    } else {
+        let mut clipboard = Clipboard::new()?;
+        clipboard.set_text(aggregated)?;
+        logger.info("Output copied to clipboard.");
     }
 
     Ok(())
 }
 
-/// Count total files for EBT estimation
-fn count_files(path: &Path, lang_filter: Option<(String,bool)>, depth_limit: Option<usize>) -> io::Result<usize> {
-    fn inner(path: &Path, lang_filter: &Option<(String,bool)>, current_depth: usize, depth_limit: Option<usize>) -> io::Result<usize> {
-        if let Some(dl) = depth_limit { if current_depth > dl { return Ok(0); } }
-
-        let mut count = 0;
-        if path.is_dir() {
-            for entry in fs::read_dir(path)? {
-                let entry = entry?;
-                count += inner(entry.path().as_path(), lang_filter, current_depth + 1, depth_limit)?;
-            }
-        } else if path.is_file() {
-            if let Some((ref ext, _)) = lang_filter {
-                if path.extension().and_then(|e| e.to_str()).map(|e| e == ext).unwrap_or(true) {
-                    count += 1;
-                }
-            } else {
-                count += 1;
-            }
-        }
-        Ok(count)
-    }
-
-    inner(path, &lang_filter, 0, depth_limit)
-}
-
-/// Parse references in code (Python, JS, C/C++)
-fn parse_references_generic(path: &Path) -> io::Result<Vec<String>> {
-    let file = File::open(path)?;
-    let reader = io::BufReader::new(file);
+/// Parse references generically (Python, JS, C/C++)
+fn parse_references_generic(path: &Path) -> std::io::Result<Vec<String>> {
+    let content = fs::read_to_string(path)?;
     let mut references = Vec::new();
+    let ext = path.extension().and_then(|s| s.to_str()).unwrap_or("");
 
-    let patterns = vec![
-        r#"(?m)^\s*import\s+([a-zA-Z0-9_\.]+)"#,
-        r#"(?m)^\s*from\s+([a-zA-Z0-9_\.]+)\s+import"#,
-        r#"require\(['"](.+?)['"]\)"#,
-        r#"(?m)^\s*import\s+.*\s+from\s+['"](.+?)['"]"#,
-        r#"(?m)^\s*#include\s*["<](.+?)["<]"#,
-    ];
-
-    for line in reader.lines() {
-        let line = line?;
-        for pat in &patterns {
-            let re = Regex::new(pat).unwrap();
-            for cap in re.captures_iter(&line) {
-                if let Some(m) = cap.get(1) {
-                    let mut r = m.as_str().to_string();
-                    if path.extension().map(|e| e == "py" || e == "js").unwrap_or(false) {
-                        r = r.replace('.', "/");
-                    }
-                    if !r.contains('.') {
-                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                            r = format!("{}.{}", r, ext);
-                        }
-                    }
-                    references.push(r);
+    for re in REF_PATTERNS.iter() {
+        for cap in re.captures_iter(&content) {
+            if let Some(m) = cap.get(1) {
+                let mut r = m.as_str().to_string();
+                if ext == "py" || ext == "js" || ext == "ts" {
+                    r = r.replace('.', "/");
                 }
+                if !r.contains('.') { r = format!("{}.{}", r, ext); }
+                references.push(r);
             }
         }
     }
-
     Ok(references)
 }
 
-/// Canonicalize a path, staying inside root_dir
-fn canonicalize_path(path: &Path, root_dir: &Path) -> PathBuf {
-    let path = if path.exists() { fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf()) } else { path.to_path_buf() };
-    if let Ok(rel) = path.strip_prefix(root_dir) {
-        root_dir.join(rel)
-    } else { path }
+/// Resolve reference path relative to source and root
+fn resolve_ref_path(source: &Path, ref_str: &str, root: &Path) -> PathBuf {
+    let base_dir = source.parent().unwrap_or(root);
+    let mut candidate = base_dir.join(ref_str);
+
+    if let Ok(canon) = fs::canonicalize(&candidate) {
+        candidate = canon;
+    } else {
+        let mut comps = Vec::new();
+        for comp in candidate.components() {
+            match comp {
+                std::path::Component::Normal(c) => comps.push(c),
+                std::path::Component::ParentDir => { comps.pop(); },
+                _ => {}
+            }
+        }
+        candidate = root.join(comps.iter().collect::<PathBuf>());
+    }
+
+    if candidate.strip_prefix(root).is_ok() {
+        candidate
+    } else {
+        root.join(ref_str)
+    }
 }

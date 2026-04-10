@@ -1,150 +1,156 @@
-# bound 📦✨
+# bound
 
-**bound** is a Rust CLI tool for recursively aggregating file contents from directories.  
-Supports language filtering, dependency resolution, token/size/depth limits, clipboard or file output, and real-time telemetry with **Estimated Bounding Time (EBT)** ⏱️ and progress reporting 📊.
-
----
-
-## Features 🌟
-
-- **Recursive Aggregation** 🔄: Walk directories and concatenate file contents.
-- **Language Filtering** 📝:
-  - `[.ext]` — include only files with a specific extension.
-  - `{.ext}` — include files **and their dependencies**.
-- **Limits** ⚖️:
-  - Token limit (`-tl <N>`) 🧮
-  - Size limit in bytes (`-sl <N>`) 💾
-  - Depth limit (`-dl <N>`) 🏞️
-- **Output Options** 📤:
-  - Clipboard (default) 📋
-  - File output (`--out <file>`) 💿
-- **Telemetry & Progress** 📊:
-  - Files processed 📂
-  - Bytes read 📏
-  - Tokens aggregated 📝
-  - Estimated Bounding Time (EBT) ⏱️
-  - Progress bars ▓▓▓
+**bound** is a Rust-based CLI utility for recursively aggregating file contents from directories. It supports language-aware filtering, dependency resolution, token/size/depth limits, and outputs to clipboard or file. Features include **estimated bounding time (EBT)**, **progress reporting**, and telemetry for large-scale processing.
 
 ---
 
-## Installation 🛠️
+## Features
 
-Requires **Rust >= 1.70**.
+- **Recursive directory traversal** with `.boundignore` support
+- **Language filtering:**
+  - `[.ext]` — fetch files with a specific extension (e.g., `[.rs]`, `[rs]`)
+  - `{.ext}` — fetch files with extension and referenced dependencies
+- **Multiple output formats:**
+  - Clipboard (default)
+  - File (`--out <filename>`)
+  - JSON (`--json`)
+- **Content limits:**
+  - Token limit (`-t, --token-limit N`)
+  - Size limit in bytes (`-s, --size-limit N`)
+  - Depth limit (`-d, --depth-limit N`)
+- **Metadata & analysis:**
+  - `--meta` — Include metadata headers (size, lines, modified time)
+  - `--meta-hash` — Include SHA-256 hash in metadata
+  - `--tree` — Include file tree visualization
+  - `--furnace` — Enable Furnace analysis (stub implementation)
+- **Progress telemetry:**
+  - Files processed, bytes read, tokens aggregated
+  - Estimated bounding time (EBT)
+  - Graceful handling of non-UTF-8 files (skipped with warning)
 
-``` bash
-git clone [https://github.com/](https://github.com/)<your-username>/bound.git
+---
+
+## Installation
+
+Requires Rust >= 1.70.
+
+```bash
+git clone https://github.com/elci-group/bound.git
 cd bound
 cargo build --release
-````
+```
 
-Binary will be available at `target/release/bound`.
+The binary will be at `target/release/bound`.
 
------
+---
 
-## Usage 🚀
+## Usage
 
-### Basic
-
-Aggregate all files in a directory:
+### Basic Examples
 
 ```bash
-bound ~/myproject
+# Aggregate all files in current directory (outputs to clipboard)
+bound
+
+# Filter by extension (both syntaxes work)
+bound [.rs] .
+bound [rs] .
+
+# Include dependency resolution (follows imports/includes)
+bound {.py} ./my-project
+
+# Output to file instead of clipboard
+bound [.md] --out documentation.txt
+
+# Include metadata and file tree
+bound [.rs] --meta --tree --out codebase.txt
 ```
 
-### Language Filtering 🐍📜
+### Filter Syntax
 
-  * Fetch all Python files:
+| Syntax | Description | Example |
+|--------|-------------|---------|
+| `[ext]` | Filter by extension only | `bound [rs]` |
+| `[.ext]` | Same as above (dot optional) | `bound [.rs]` |
+| `{ext}` | Extension + dependency resolution | `bound {.py}` |
+| `{.ext}` | Same as above (dot optional) | `bound {.js}` |
 
-<!-- end list -->
+### Content Limits
 
 ```bash
-bound [.py] ~/projects/mycode
+# Limit tokens per file (splits on whitespace)
+bound [.rs] -t 1000
+
+# Limit bytes per file
+bound [.rs] -s 50000
+
+# Limit directory traversal depth
+bound -d 3
 ```
 
-  * Fetch Python files **and dependencies**:
+### Output Formats
 
-<!-- end list -->
+**Default (expandable blocks):**
+```bash
+bound [.rs] --meta --tree
+```
+
+**JSON:**
+```bash
+bound [.rs] --json --out output.json
+```
+
+JSON structure:
+```json
+{
+  "tree": "...",
+  "files": [
+    {
+      "metadata": { "relative_path": "...", "size_bytes": 123, ... },
+      "content": "...",
+      "furnace_report": null
+    }
+  ]
+}
+```
+
+### Error Handling
+
+Non-UTF-8 files are automatically skipped with a warning:
+```
+[1775827984] ⚠️ WARN Skipping /path/to/binary.dat: stream did not contain valid UTF-8
+```
+
+---
+
+## Configuration
+
+Create a `.boundignore` file in your project root to exclude files/directories:
+
+```
+target/
+.git/
+node_modules/
+*.log
+```
+
+---
+
+## Development
 
 ```bash
-bound {.py} ~/projects/mycode
+# Build debug version
+cargo build
+
+# Build release version
+cargo build --release
+
+# Run with arguments
+cargo run -- [.rs] --tree
 ```
 
-### Limits ⚡
+---
 
-  * Token-limited (max 1000 tokens):
+## License
 
-<!-- end list -->
-
-```bash
-bound ~/myproject -tl 1000
-```
-
-  * Size-limited (max 10 KB):
-
-<!-- end list -->
-
-```bash
-bound ~/myproject -sl 10240
-```
-
-  * Depth-limited (max recursion depth 3):
-
-<!-- end list -->
-
-```bash
-bound ~/myproject -dl 3
-```
-
-### Output 🖨️
-
-  * **Clipboard (default)** 📋
-  * **File output** 💾:
-
-<!-- end list -->
-
-```bash
-bound ~/myproject --out output.txt
-```
-
------
-
-## Examples 🔍
-
-Aggregate Python scripts and dependencies in `~/AcidPlayer`, limit to 5000 tokens, 20 KB, depth 5, and save to file:
-
-```bash
-bound {.py} ~/AcidPlayer -tl 5000 -sl 20480 -dl 5 --out aggregate.txt
-```
-
------
-
-## Telemetry & Progress ⏱️📊
-
-Progress example:
-
-```
-[ 45% | Files: 90 | Bytes: 23456 | Tokens: 4567 | EBT: 12.4s ]
-```
-
-  * **%** — Progress
-  * **Files** — Processed files 📂
-  * **Bytes** — Bytes read 💾
-  * **Tokens** — Aggregated words/terms 📝
-  * **EBT** — Estimated time remaining ⏳
-
-Updates every 10 files or at the end of processing.
-
------
-
-## Contributing 🤝
-
-Fork the repo, make your changes, and submit a pull request. Contributions welcome\! ✨
-
------
-
-## License 📝
-
-MIT License © 2025
-
-```
-```
+MIT
