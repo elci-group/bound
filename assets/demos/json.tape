@@ -5,12 +5,7 @@ Set Width 900
 Set Height 500
 Set Theme "Dracula"
 
-Type "bound [.rs] -- --json --out output.json src"
+Type "bound [.rs] -- --json src"
 Sleep 500ms
 Enter
-Sleep 1s
-
-Type "cat output.json | head -30"
-Sleep 500ms
-Enter
-Sleep 2s
+Sleep 3s
