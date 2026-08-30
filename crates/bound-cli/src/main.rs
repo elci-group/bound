@@ -1,3 +1,4 @@
+mod curly_expand;
 use std::fs::File;
 use std::io::Write;
 use std::path::PathBuf;
@@ -126,7 +127,7 @@ struct Args {
     redact_replacement: Option<String>,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn __curly_original_main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
     let logger = Logger::new(LogLevel::Info, None);
@@ -198,4 +199,305 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+fn main() {
+    let raw_args: Vec<String> = std::env::args().collect();
+    let mut positions: Vec<usize> = Vec::new();
+    let mut fields: Vec<Vec<String>> = Vec::new();
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--out" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--out=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--out={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--git-commit" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--git-commit=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--git-commit={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-config" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-config=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-config={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-regex" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-regex=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-regex={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-regex-file" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-regex-file=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-regex-file={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-csv" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-csv=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-csv={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-sqlite" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-sqlite=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-sqlite={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-sqlite-query" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-sqlite-query=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-sqlite-query={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-padagonia" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-padagonia=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-padagonia={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-padagonia-url" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-padagonia-url=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-padagonia-url={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-padagonia-token" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-padagonia-token=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-padagonia-token={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-padagonia-namespace" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-padagonia-namespace=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-padagonia-namespace={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-padagonia-label" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-padagonia-label=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-padagonia-label={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-padagonia-property" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-padagonia-property=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-padagonia-property={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+    for (__i, __a) in raw_args.iter().enumerate() {
+        if __a == "--redact-replacement" {
+            if let Some(__v) = raw_args.get(__i + 1) {
+                positions.push(__i + 1);
+                fields.push(curly_expand::expand_or_literal(__v));
+            }
+            break;
+        } else if let Some(__v) = __a.strip_prefix("--redact-replacement=") {
+            positions.push(__i);
+            fields.push(
+                curly_expand::expand_or_literal(__v)
+                    .into_iter()
+                    .map(|v| format!("--redact-replacement={}", v))
+                    .collect(),
+            );
+            break;
+        }
+    }
+
+    if fields.is_empty() || fields.iter().all(|f| f.len() <= 1) {
+        __curly_original_main();
+        return;
+    }
+
+    let combos = curly_expand::cartesian(&fields);
+    let exe = std::env::current_exe().expect("resolve current exe");
+    let mut had_failure = false;
+    for combo in &combos {
+        let mut new_args = raw_args.clone();
+        for (slot, value) in positions.iter().zip(combo.iter()) {
+            new_args[*slot] = value.clone();
+        }
+        let status = std::process::Command::new(&exe)
+            .args(&new_args[1..])
+            .status()
+            .expect("failed to re-exec self");
+        if !status.success() {
+            had_failure = true;
+        }
+    }
+    if had_failure {
+        std::process::exit(1);
+    }
 }
