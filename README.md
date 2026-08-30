@@ -47,6 +47,9 @@
 
 Requires Rust >= 1.70.
 
+`bound` is organised as a Cargo workspace containing the `bound-core` library
+and the `bound-cli` binary.
+
 ```bash
 git clone https://github.com/elci-group/bound.git
 cd bound
@@ -54,6 +57,13 @@ cargo build --release
 ```
 
 The binary will be at `target/release/bound`.
+
+You can also use `bound-core` as a library dependency:
+
+```toml
+[dependencies]
+bound-core = { path = "../bound/crates/bound-core" }
+```
 
 ---
 
@@ -167,3 +177,4 @@ cargo run -- [.rs] --tree
 ## License
 
 MIT
+# trigger

@@ -15,3 +15,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Backup artifacts
+*.oip.backup
+.dreams/

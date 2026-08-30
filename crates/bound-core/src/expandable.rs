@@ -1,8 +1,8 @@
 //! expandable.rs
 //! Provides helper functions to wrap content in expandable{} blocks.
 
-use std::collections::HashMap;
 use serde::Serialize;
+use std::collections::HashMap;
 
 /// Represents a generic expandable block
 #[derive(Debug, Clone, Serialize)]

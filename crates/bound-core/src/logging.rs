@@ -1,12 +1,11 @@
-
 //! logging.rs
 //! Simple logging wrapper with levels and optional file output.
 
+use form3::compat::Colorize;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
-use colored::Colorize;
 
 #[derive(Debug, Clone, Copy)]
 pub enum LogLevel {
@@ -79,9 +78,19 @@ impl Logger {
     }
 
     /// Convenience methods for each level
-    pub fn error(&self, msg: &str) { self.log(LogLevel::Error, msg); }
-    pub fn warn(&self, msg: &str) { self.log(LogLevel::Warn, msg); }
-    pub fn info(&self, msg: &str) { self.log(LogLevel::Info, msg); }
-    pub fn debug(&self, msg: &str) { self.log(LogLevel::Debug, msg); }
-    pub fn trace(&self, msg: &str) { self.log(LogLevel::Trace, msg); }
+    pub fn error(&self, msg: &str) {
+        self.log(LogLevel::Error, msg);
+    }
+    pub fn warn(&self, msg: &str) {
+        self.log(LogLevel::Warn, msg);
+    }
+    pub fn info(&self, msg: &str) {
+        self.log(LogLevel::Info, msg);
+    }
+    pub fn debug(&self, msg: &str) {
+        self.log(LogLevel::Debug, msg);
+    }
+    pub fn trace(&self, msg: &str) {
+        self.log(LogLevel::Trace, msg);
+    }
 }

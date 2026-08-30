@@ -1,5 +1,11 @@
 # kaptaind configuration — Vico ecosystem monitoring
 
+[trust]
+execution = "trusted"
+
+[operation]
+mode = "actuate"
+
 [watch]
 path = "."
 recursive = true

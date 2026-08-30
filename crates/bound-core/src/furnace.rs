@@ -1,13 +1,13 @@
 //! furnace.rs
 //! Placeholder for Furnace integration: richer contextual analysis of files.
 
-use std::path::Path;
-use serde::Serialize;
 use crate::expandable::ExpandableBlock;
 use crate::metadata::FileMetadata;
+use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 /// Represents a structured Furnace report
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FurnaceReport {
     pub file_meta: FileMetadata,
     pub notes: Vec<String>,
@@ -36,9 +36,7 @@ impl FurnaceReport {
 /// Analyze a file (stub implementation)
 pub fn analyze_file(_path: &Path, meta: &FileMetadata) -> FurnaceReport {
     // Placeholder: real logic will compute structural notes, complexity, etc.
-    let notes = vec![
-        "Stub analysis: content not yet analyzed.".to_string()
-    ];
+    let notes = vec!["Stub analysis: content not yet analyzed.".to_string()];
 
     FurnaceReport {
         file_meta: meta.clone(),

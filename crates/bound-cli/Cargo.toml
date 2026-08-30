@@ -1,0 +1,17 @@
+[package]
+name = "bound-cli"
+version = "0.1.5"
+edition = "2021"
+authors = ["Rory Spring-Vanhorne <rory.spring@icloud.com>"]
+description = "Recursive file aggregator with language-aware dependency resolution and clipboard support"
+license = "MIT"
+
+[[bin]]
+name = "bound"
+path = "src/main.rs"
+
+[dependencies]
+bound-core = { path = "../bound-core" }
+arboard = "3.6"
+clap = { version = "4.4", features = ["derive"] }
+serde_json = "1.0.149"

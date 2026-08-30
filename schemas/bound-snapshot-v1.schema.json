@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/elci-group/bound/schemas/bound-snapshot-v1.schema.json",
+  "title": "bound-snapshot",
+  "description": "Versioned project snapshot produced by bound / bound-core.",
+  "type": "object",
+  "required": ["schema", "schema_version", "producer", "producer_version", "target", "generated_at", "filter", "limits", "files", "summary"],
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "bound-snapshot"
+    },
+    "schema_version": {
+      "type": "string",
+      "description": "Semantic version of the snapshot schema."
+    },
+    "producer": {
+      "type": "string",
+      "description": "Name of the tool that produced the snapshot."
+    },
+    "producer_version": {
+      "type": "string",
+      "description": "Version of the producing tool."
+    },
+    "target": {
+      "type": "string",
+      "description": "Absolute path to the bundled project root."
+    },
+    "target_commit": {
+      "type": ["string", "null"],
+      "description": "Git commit SHA of the target project, if available."
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "Unix timestamp when the snapshot was generated."
+    },
+    "filter": {
+      "type": "object",
+      "required": ["extension", "dependency_aware"],
+      "properties": {
+        "extension": {
+          "type": ["string", "null"],
+          "description": "File extension filter, without leading dot."
+        },
+        "dependency_aware": {
+          "type": "boolean",
+          "description": "Whether dependency resolution was enabled."
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "required": ["token", "size", "depth"],
+      "properties": {
+        "token": {
+          "type": ["integer", "null"],
+          "description": "Maximum tokens per file."
+        },
+        "size": {
+          "type": ["integer", "null"],
+          "description": "Maximum bytes per file."
+        },
+        "depth": {
+          "type": ["integer", "null"],
+          "description": "Maximum directory traversal depth."
+        }
+      }
+    },
+    "tree": {
+      "type": ["string", "null"],
+      "description": "Optional textual file tree representation."
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/file"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["file_count", "total_bytes", "total_lines"],
+      "properties": {
+        "file_count": {
+          "type": "integer"
+        },
+        "total_bytes": {
+          "type": "integer"
+        },
+        "total_lines": {
+          "type": "integer"
+        }
+      }
+    },
+    "redaction_stats": {
+      "type": ["object", "null"],
+      "description": "Summary of redaction work performed, if redaction was enabled.",
+      "required": ["rules_loaded", "files_redacted", "total_replacements"],
+      "properties": {
+        "rules_loaded": {
+          "type": "integer"
+        },
+        "files_redacted": {
+          "type": "integer"
+        },
+        "total_replacements": {
+          "type": "integer"
+        },
+        "path_replacements": {
+          "type": ["integer", "null"],
+          "description": "Number of replacements performed in file paths, tree, and metadata headers when path redaction is enabled."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "file": {
+      "type": "object",
+      "required": ["path", "relative_path", "language", "size_bytes", "lines", "modified_unix", "sha256", "content", "dependencies"],
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "relative_path": {
+          "type": "string"
+        },
+        "language": {
+          "type": ["string", "null"]
+        },
+        "size_bytes": {
+          "type": "integer"
+        },
+        "lines": {
+          "type": "integer"
+        },
+        "modified_unix": {
+          "type": "integer"
+        },
+        "sha256": {
+          "type": ["string", "null"]
+        },
+        "content": {
+          "type": ["string", "null"]
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "furnace_report": {
+          "$ref": "#/$defs/furnace_report"
+        },
+        "redactions": {
+          "type": ["integer", "null"],
+          "description": "Number of redaction replacements performed in this file."
+        }
+      }
+    },
+    "furnace_report": {
+      "type": "object",
+      "required": ["file_meta", "notes", "complexity"],
+      "properties": {
+        "file_meta": {
+          "$ref": "#/$defs/file_meta"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "complexity": {
+          "type": ["number", "null"]
+        }
+      }
+    },
+    "file_meta": {
+      "type": "object",
+      "required": ["relative_path", "size_bytes", "line_count", "modified_unix", "sha256"],
+      "properties": {
+        "relative_path": {
+          "type": "string"
+        },
+        "size_bytes": {
+          "type": "integer"
+        },
+        "line_count": {
+          "type": "integer"
+        },
+        "modified_unix": {
+          "type": "integer"
+        },
+        "sha256": {
+          "type": ["string", "null"]
+        }
+      }
+    }
+  }
+}

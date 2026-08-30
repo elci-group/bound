@@ -1,4 +1,3 @@
-
 //! tree.rs
 //! Generates a directory-style tree representation of a list of files.
 
@@ -41,5 +40,9 @@ pub fn generate_tree(root: &Path, files: &[PathBuf]) -> String {
         last_components = components;
     }
 
-    format!("🌳 PROJECT TREE (root: {})\n\n{}\n", root.display(), tree_lines.join("\n"))
+    format!(
+        "🌳 PROJECT TREE (root: {})\n\n{}\n",
+        root.display(),
+        tree_lines.join("\n")
+    )
 }

@@ -1,0 +1,38 @@
+[[file]]
+path = "crates/bound-core/src/redaction.rs"
+required = true
+
+[[file]]
+path = "crates/bound-core/src/lib.rs"
+required = true
+
+[[file]]
+path = "crates/bound-cli/src/main.rs"
+required = true
+
+[[file]]
+path = "schemas/bound-snapshot-v1.schema.json"
+required = true
+
+[[file]]
+path = "AGENTS.md"
+required = true
+
+[[command]]
+name = "cargo test"
+cmd = ["cargo", "test"]
+expect_exit = 0
+timeout_secs = 300
+stdout_contains = ["test result: ok"]
+
+[[command]]
+name = "cargo build --release"
+cmd = ["cargo", "build", "--release"]
+expect_exit = 0
+timeout_secs = 300
+
+[[command]]
+name = "cargo clippy"
+cmd = ["cargo", "clippy", "--all-targets"]
+expect_exit = 0
+timeout_secs = 300

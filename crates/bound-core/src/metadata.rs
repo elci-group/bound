@@ -1,4 +1,3 @@
-
 //! metadata.rs
 //! Provides file metadata collection for bound outputs.
 
@@ -6,9 +5,9 @@ use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileMetadata {
     pub relative_path: String,
     pub size_bytes: u64,
