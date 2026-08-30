@@ -153,7 +153,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         padagonia_limit: args.redact_padagonia_limit.unwrap_or(10_000),
         padagonia_cache_ttl: args.redact_padagonia_cache_ttl.unwrap_or(3_600),
         padagonia_retries: args.redact_padagonia_retries.unwrap_or(3),
-        replacement: args.redact_replacement.unwrap_or_else(|| "[REDACTED]".to_string()),
+        replacement: args
+            .redact_replacement
+            .unwrap_or_else(|| "[REDACTED]".to_string()),
         redact_paths: args.redact_paths,
     };
 

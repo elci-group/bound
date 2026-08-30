@@ -169,13 +169,15 @@ impl RedactionOptions {
             self.padagonia_token.clone_from(&other.padagonia_token);
         }
         if other.padagonia_namespace.is_some() {
-            self.padagonia_namespace.clone_from(&other.padagonia_namespace);
+            self.padagonia_namespace
+                .clone_from(&other.padagonia_namespace);
         }
         if other.padagonia_label.is_some() {
             self.padagonia_label.clone_from(&other.padagonia_label);
         }
         if other.padagonia_property.is_some() {
-            self.padagonia_property.clone_from(&other.padagonia_property);
+            self.padagonia_property
+                .clone_from(&other.padagonia_property);
         }
         if other.padagonia_limit != 10_000 {
             self.padagonia_limit = other.padagonia_limit;
@@ -383,9 +385,7 @@ pub fn redact_paths_in_snapshot(engine: &RedactionEngine, snapshot: &mut crate::
 
 fn read_lines(path: &Path) -> Result<impl Iterator<Item = String>, BundleError> {
     let file = File::open(path).map_err(BundleError::Io)?;
-    Ok(BufReader::new(file)
-        .lines()
-        .map_while(Result::ok))
+    Ok(BufReader::new(file).lines().map_while(Result::ok))
 }
 
 fn load_csv(path: &Path) -> Result<Vec<String>, BundleError> {
@@ -448,7 +448,9 @@ fn load_padagonia(path: &Path) -> Result<Vec<String>, BundleError> {
         if trimmed.is_empty() {
             continue;
         }
-        let value = if let Ok(obj) = serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(trimmed) {
+        let value = if let Ok(obj) =
+            serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(trimmed)
+        {
             if let Some(serde_json::Value::String(s)) = obj.get("value") {
                 s.clone()
             } else {
@@ -530,17 +532,13 @@ mod padagonia_client {
             .as_deref()
             .unwrap_or(DEFAULT_PADAGONIA_URL)
             .trim_end_matches('/');
-        let namespace = options
-            .padagonia_namespace
-            .as_deref()
-            .ok_or_else(|| BundleError::InvalidFilter(
+        let namespace = options.padagonia_namespace.as_deref().ok_or_else(|| {
+            BundleError::InvalidFilter(
                 "--redact-padagonia-namespace is required for live Padagonia queries".to_string(),
-            ))?;
+            )
+        })?;
         let label = options.padagonia_label.as_deref();
-        let property = options
-            .padagonia_property
-            .as_deref()
-            .unwrap_or("value");
+        let property = options.padagonia_property.as_deref().unwrap_or("value");
         let page_size = options.padagonia_limit.clamp(1, 1000);
         let max_total = options.padagonia_limit;
 
@@ -583,9 +581,9 @@ mod padagonia_client {
                 }
             };
 
-            let body = response.into_string().map_err(|e| {
-                BundleError::Io(std::io::Error::other(e))
-            })?;
+            let body = response
+                .into_string()
+                .map_err(|e| BundleError::Io(std::io::Error::other(e)))?;
             let (page_values, next_cursor) = parse_page_response(&body, property)?;
 
             fetched += page_values.len();
@@ -612,7 +610,9 @@ mod padagonia_client {
             "Loaded {} forbidden strings from Padagonia at {}{}",
             values.len(),
             url,
-            label.map(|l| format!(" (label: {})", l)).unwrap_or_default()
+            label
+                .map(|l| format!(" (label: {})", l))
+                .unwrap_or_default()
         ));
 
         Ok(values)
@@ -662,9 +662,8 @@ mod padagonia_client {
         body: &str,
         property: &str,
     ) -> Result<(Vec<String>, Option<String>), BundleError> {
-        let page: PageCursorResponse = serde_json::from_str(body).map_err(|e| {
-            BundleError::Io(std::io::Error::other(e))
-        })?;
+        let page: PageCursorResponse =
+            serde_json::from_str(body).map_err(|e| BundleError::Io(std::io::Error::other(e)))?;
         let mut values = Vec::new();
         for node in page.nodes {
             if let Some(serde_json::Value::String(s)) = node.properties.get(property) {
@@ -745,7 +744,9 @@ mod tests {
     #[test]
     fn regex_redaction() {
         let engine = RedactionEngine::new(
-            vec![RedactionRule::Regex(Regex::new(r"sk-[a-zA-Z0-9]{10}").unwrap())],
+            vec![RedactionRule::Regex(
+                Regex::new(r"sk-[a-zA-Z0-9]{10}").unwrap(),
+            )],
             "[REDACTED]",
         )
         .unwrap();
@@ -796,10 +797,16 @@ mod tests {
     fn load_sqlite_query() {
         let tmp = tempfile::NamedTempFile::new().unwrap();
         let conn = rusqlite::Connection::open(tmp.path()).unwrap();
-        conn.execute("CREATE TABLE secrets (id INTEGER PRIMARY KEY, value TEXT)", [])
-            .unwrap();
-        conn.execute("INSERT INTO secrets (value) VALUES (?1), (?2)", ["alpha", "beta"])
-            .unwrap();
+        conn.execute(
+            "CREATE TABLE secrets (id INTEGER PRIMARY KEY, value TEXT)",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO secrets (value) VALUES (?1), (?2)",
+            ["alpha", "beta"],
+        )
+        .unwrap();
         drop(conn);
 
         let values = load_sqlite(tmp.path(), "SELECT value FROM secrets ORDER BY id").unwrap();
@@ -966,9 +973,9 @@ retries = 5
     fn retry_succeeds_after_transient_failure() {
         use std::io::{Read, Write};
         use std::net::TcpListener;
-        use std::thread;
         use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc;
+        use std::thread;
 
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
@@ -983,7 +990,10 @@ retries = 5
                 let (status, body) = if count == 0 {
                     ("503 Service Unavailable", "{}")
                 } else {
-                    ("200 OK", r#"{"api_version":"v1","nodes":[{"properties":{"value":"retry-secret"}}],"next_cursor":null}"#)
+                    (
+                        "200 OK",
+                        r#"{"api_version":"v1","nodes":[{"properties":{"value":"retry-secret"}}],"next_cursor":null}"#,
+                    )
                 };
                 let response = format!(
                     "HTTP/1.1 {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
