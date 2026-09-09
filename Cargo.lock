@@ -478,7 +478,8 @@ dependencies = [
 
 [[package]]
 name = "form3"
-version = "0.1.0"
+version = "0.1.1"
+source = "git+https://github.com/elci-group/form3#0a3d331a771a1eb6266839c701ee213a44e5f514"
 
 [[package]]
 name = "form_urlencoded"

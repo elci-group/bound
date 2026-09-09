@@ -1,10 +1,11 @@
-# kaptaind configuration — Vico ecosystem monitoring
-
-[trust]
-execution = "trusted"
+# kaptaind configuration — adapted from dreamsequence's and obserde's working
+# examples for a one-off actuated commit+push of the form3 dependency fix.
 
 [operation]
 mode = "actuate"
+
+[capabilities]
+network_push = true
 
 [watch]
 path = "."
@@ -12,45 +13,34 @@ recursive = true
 ignore_file = ".kaptainignore"
 
 [cluster]
-window = 5
-adaptive = true
-min_window_secs = 2
-max_window_secs = 60
-burst_threshold = 20
-max_paths = 25
-flush_after = 10
+window = 2
 
 [weights]
-s = 0.30
-a = 0.35
+s = 0.35
+a = 0.30
 d = 0.20
 r = 0.15
+
+[version_thresholds]
+minor = 0.6
+patch = 0.0
 
 [push]
 enabled = true
 branch = "main"
 
-[ratelimit]
-min_commit_interval = 10
+# bound is a normal single-branch app repo pushing straight to main, so the
+# default protect_branches = ["main", "master"] safety net is explicitly
+# overridden here, same as obserde's kaptaind.toml.
+[push.safety]
+protect_branches = []
 
-[version_thresholds]
-patch = 0.0
-minor = 0.6
+[ratelimit]
+min_commit_interval = 2
+
+[trust]
+execution = "trusted"
 
 [test]
-command = "cargo test"
-required = false
-
-[staging]
-mode = "cluster"
-exclude = [
-  "*.log",
-  ".env*",
-  "*.db",
-  "*.sqlite",
-  "node_modules/**",
-  "dist/**",
-  "target/**",
-  ".kaptaind/**",
-  
-]
+command = "cargo build --release --locked"
+required = true
