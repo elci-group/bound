@@ -42,6 +42,10 @@ struct Args {
     #[arg(long)]
     meta_hash: bool,
 
+    /// Use Mesut Blocking/Compute pipelines for file reads and metadata hashing
+    #[arg(long)]
+    mesut: bool,
+
     /// Include file tree
     #[arg(long)]
     tree: bool,
@@ -180,7 +184,11 @@ fn __curly_original_main() -> Result<(), Box<dyn std::error::Error>> {
         redaction,
     };
 
-    let output = bundle(&options, &logger)?;
+    let output = if args.mesut {
+        bound_core::bundle_with_mesut(&options, &logger)?
+    } else {
+        bundle(&options, &logger)?
+    };
 
     let aggregated = if args.json {
         serde_json::to_string_pretty(&output.snapshot)?

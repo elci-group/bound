@@ -19,6 +19,8 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 ureq = { version = "2.12", features = ["json"] }
 toml = "0.8"
 dirs = "5.0"
+mesut = { path = "../../../mesut/crates/mesut" }
+tokio = { version = "1", features = ["rt", "time"] }
 
 [dev-dependencies]
 tempfile = "3.14"

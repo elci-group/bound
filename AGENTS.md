@@ -32,6 +32,7 @@ Run the built binary with arguments:
   - `--out <FILE>`: Output to file instead of clipboard.
   - `--meta`: Include metadata headers.
   - `--meta-hash`: Include SHA-256 hash in metadata.
+  - `--mesut`: Opt in to Mesut Blocking reads and Compute metadata/hash pipelines; output semantics and the default synchronous backend are unchanged.
   - `--tree`: Include file tree.
   - `--furnace`: Enable Furnace analysis.
   - `--redact-config <FILE>`: TOML config file for redaction rules. CLI flags override config values.

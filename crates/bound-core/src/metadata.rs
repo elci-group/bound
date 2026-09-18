@@ -69,7 +69,7 @@ pub fn collect_metadata(path: &Path, root: &Path, hash: bool) -> std::io::Result
 }
 
 /// Simple SHA-256 hasher for file content
-fn hash_string(data: &str) -> String {
+pub(crate) fn hash_string(data: &str) -> String {
     use sha2::{Digest, Sha256};
     let mut h = Sha256::new();
     h.update(data.as_bytes());

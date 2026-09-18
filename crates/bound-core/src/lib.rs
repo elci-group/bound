@@ -16,7 +16,9 @@ use serde::{Deserialize, Serialize};
 pub mod expandable;
 pub mod furnace;
 pub mod logging;
+mod mesut_backend;
 pub mod metadata;
+pub use mesut_backend::bundle_with_mesut;
 pub mod redaction;
 pub mod telemetry;
 pub mod tree;
@@ -258,6 +260,31 @@ fn detect_git_commit(directory: &Path) -> Option<String> {
 
 /// Bundle a project according to the supplied options.
 pub fn bundle(options: &BundleOptions, logger: &Logger) -> Result<BundleOutput, BundleError> {
+    bundle_with_loader(options, logger, |paths, root, options| {
+        Ok(paths
+            .iter()
+            .map(|path| LoadedFile {
+                meta: options
+                    .include_meta
+                    .then(|| collect_metadata(path, root, options.include_meta_hash).ok())
+                    .flatten(),
+                content: fs::read_to_string(path).ok(),
+            })
+            .collect())
+    })
+}
+
+#[derive(Serialize, Deserialize)]
+struct LoadedFile {
+    meta: Option<FileMetadata>,
+    content: Option<String>,
+}
+
+fn bundle_with_loader(
+    options: &BundleOptions,
+    logger: &Logger,
+    mut load: impl FnMut(&[PathBuf], &Path, &BundleOptions) -> Result<Vec<LoadedFile>, BundleError>,
+) -> Result<BundleOutput, BundleError> {
     let (filter_ext, dep_aware) = parse_filter(options.filter.as_deref())?;
     let root_dir = fs::canonicalize(&options.directory)?;
     let target_commit = options
@@ -336,87 +363,81 @@ pub fn bundle(options: &BundleOptions, logger: &Logger) -> Result<BundleOutput, 
     let mut files_redacted: usize = 0;
     let mut total_replacements: usize = 0;
 
-    for path in &sorted_files {
-        let meta = if options.include_meta {
-            match collect_metadata(path, &root_dir, options.include_meta_hash) {
-                Ok(m) => Some(m),
-                Err(_) => None,
+    for paths in sorted_files.chunks(32) {
+        for (path, loaded) in paths.iter().zip(load(paths, &root_dir, options)?) {
+            let meta = loaded.meta;
+            let content = match loaded.content {
+                Some(c) => c,
+                None => continue,
+            };
+
+            let mut processed_content = content.clone();
+            let mut redactions: Option<usize> = None;
+            if let Some(engine) = &redaction_engine {
+                let (redacted, count) = engine.apply(&processed_content);
+                processed_content = redacted;
+                if count > 0 {
+                    redactions = Some(count);
+                    files_redacted += 1;
+                    total_replacements += count;
+                }
             }
-        } else {
-            None
-        };
-
-        let content = match fs::read_to_string(path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        let mut processed_content = content.clone();
-        let mut redactions: Option<usize> = None;
-        if let Some(engine) = &redaction_engine {
-            let (redacted, count) = engine.apply(&processed_content);
-            processed_content = redacted;
-            if count > 0 {
-                redactions = Some(count);
-                files_redacted += 1;
-                total_replacements += count;
+            if let Some(tl) = options.token_limit {
+                processed_content = processed_content
+                    .split_whitespace()
+                    .take(tl)
+                    .collect::<Vec<&str>>()
+                    .join(" ");
             }
-        }
-        if let Some(tl) = options.token_limit {
-            processed_content = processed_content
-                .split_whitespace()
-                .take(tl)
-                .collect::<Vec<&str>>()
-                .join(" ");
-        }
-        if let Some(sl) = options.size_limit {
-            if processed_content.len() > sl {
-                processed_content.truncate(sl);
+            if let Some(sl) = options.size_limit {
+                if processed_content.len() > sl {
+                    processed_content.truncate(sl);
+                }
             }
+
+            let furnace_report = if options.include_furnace {
+                meta.as_ref().map(|m| analyze_file(path, m))
+            } else {
+                None
+            };
+
+            let relative_path = path
+                .strip_prefix(&root_dir)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .to_string();
+
+            let size_bytes = meta
+                .as_ref()
+                .map(|m| m.size_bytes)
+                .unwrap_or_else(|| fs::metadata(path).map(|m| m.len()).unwrap_or(0));
+            let lines = meta
+                .as_ref()
+                .map(|m| m.line_count)
+                .unwrap_or_else(|| processed_content.lines().count());
+            let modified_unix = meta.as_ref().map(|m| m.modified_unix).unwrap_or(0);
+            let sha256 = meta.as_ref().and_then(|m| m.sha256.clone());
+
+            total_bytes += size_bytes as usize;
+            total_lines += lines;
+
+            entries.push(FileEntry {
+                path: path.clone(),
+                relative_path,
+                language: path
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_string()),
+                size_bytes,
+                lines,
+                modified_unix,
+                sha256,
+                content: Some(processed_content),
+                dependencies: Vec::new(),
+                furnace_report,
+                redactions,
+            });
         }
-
-        let furnace_report = if options.include_furnace {
-            meta.as_ref().map(|m| analyze_file(path, m))
-        } else {
-            None
-        };
-
-        let relative_path = path
-            .strip_prefix(&root_dir)
-            .unwrap_or(path)
-            .to_string_lossy()
-            .to_string();
-
-        let size_bytes = meta
-            .as_ref()
-            .map(|m| m.size_bytes)
-            .unwrap_or_else(|| fs::metadata(path).map(|m| m.len()).unwrap_or(0));
-        let lines = meta
-            .as_ref()
-            .map(|m| m.line_count)
-            .unwrap_or_else(|| processed_content.lines().count());
-        let modified_unix = meta.as_ref().map(|m| m.modified_unix).unwrap_or(0);
-        let sha256 = meta.as_ref().and_then(|m| m.sha256.clone());
-
-        total_bytes += size_bytes as usize;
-        total_lines += lines;
-
-        entries.push(FileEntry {
-            path: path.clone(),
-            relative_path,
-            language: path
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(|s| s.to_string()),
-            size_bytes,
-            lines,
-            modified_unix,
-            sha256,
-            content: Some(processed_content),
-            dependencies: Vec::new(),
-            furnace_report,
-            redactions,
-        });
     }
 
     let mut snapshot = Snapshot {

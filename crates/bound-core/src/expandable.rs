@@ -34,7 +34,9 @@ impl ExpandableBlock {
         lines.push(format!("expandable{{"));
         lines.push(format!("  type: {}", self.tag));
 
-        for (k, v) in &self.attributes {
+        let mut attrs: Vec<_> = self.attributes.iter().collect();
+        attrs.sort_by_key(|(k, _)| *k);
+        for (k, v) in attrs {
             lines.push(format!("  {}: {}", k, v));
         }
 
