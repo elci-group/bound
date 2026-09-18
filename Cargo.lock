@@ -497,7 +497,7 @@ dependencies = [
 [[package]]
 name = "form3"
 version = "0.1.1"
-source = "git+https://github.com/elci-group/form3#0a3d331a771a1eb6266839c701ee213a44e5f514"
+source = "git+https://github.com/elci-group/form3?rev=0a3d331a771a1eb6266839c701ee213a44e5f514#0a3d331a771a1eb6266839c701ee213a44e5f514"
 
 [[package]]
 name = "form_urlencoded"
@@ -863,6 +863,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "mesut"
 version = "0.1.0"
+source = "git+https://github.com/elci-group/mesut?rev=5397efdd0a1621ad0177461af0732a4fa21975d4#5397efdd0a1621ad0177461af0732a4fa21975d4"
 dependencies = [
  "async-trait",
  "mesut-blocking",
@@ -881,6 +882,7 @@ dependencies = [
 [[package]]
 name = "mesut-blocking"
 version = "0.1.0"
+source = "git+https://github.com/elci-group/mesut?rev=5397efdd0a1621ad0177461af0732a4fa21975d4#5397efdd0a1621ad0177461af0732a4fa21975d4"
 dependencies = [
  "async-trait",
  "mesut-core",
@@ -896,6 +898,7 @@ dependencies = [
 [[package]]
 name = "mesut-core"
 version = "0.1.0"
+source = "git+https://github.com/elci-group/mesut?rev=5397efdd0a1621ad0177461af0732a4fa21975d4#5397efdd0a1621ad0177461af0732a4fa21975d4"
 dependencies = [
  "parking_lot",
  "serde",
@@ -907,6 +910,7 @@ dependencies = [
 [[package]]
 name = "mesut-executor"
 version = "0.1.0"
+source = "git+https://github.com/elci-group/mesut?rev=5397efdd0a1621ad0177461af0732a4fa21975d4#5397efdd0a1621ad0177461af0732a4fa21975d4"
 dependencies = [
  "async-trait",
  "mesut-core",
@@ -919,6 +923,7 @@ dependencies = [
 [[package]]
 name = "mesut-observe"
 version = "0.1.0"
+source = "git+https://github.com/elci-group/mesut?rev=5397efdd0a1621ad0177461af0732a4fa21975d4#5397efdd0a1621ad0177461af0732a4fa21975d4"
 dependencies = [
  "mesut-core",
  "parking_lot",
@@ -931,6 +936,7 @@ dependencies = [
 [[package]]
 name = "mesut-rayon"
 version = "0.1.0"
+source = "git+https://github.com/elci-group/mesut?rev=5397efdd0a1621ad0177461af0732a4fa21975d4#5397efdd0a1621ad0177461af0732a4fa21975d4"
 dependencies = [
  "async-trait",
  "mesut-core",
@@ -946,6 +952,7 @@ dependencies = [
 [[package]]
 name = "mesut-router"
 version = "0.1.0"
+source = "git+https://github.com/elci-group/mesut?rev=5397efdd0a1621ad0177461af0732a4fa21975d4#5397efdd0a1621ad0177461af0732a4fa21975d4"
 dependencies = [
  "mesut-core",
  "mesut-executor",
@@ -957,6 +964,7 @@ dependencies = [
 [[package]]
 name = "mesut-runtime"
 version = "0.1.0"
+source = "git+https://github.com/elci-group/mesut?rev=5397efdd0a1621ad0177461af0732a4fa21975d4#5397efdd0a1621ad0177461af0732a4fa21975d4"
 dependencies = [
  "async-trait",
  "mesut-core",
@@ -974,6 +982,7 @@ dependencies = [
 [[package]]
 name = "mesut-scheduler"
 version = "0.1.0"
+source = "git+https://github.com/elci-group/mesut?rev=5397efdd0a1621ad0177461af0732a4fa21975d4#5397efdd0a1621ad0177461af0732a4fa21975d4"
 dependencies = [
  "async-trait",
  "mesut-core",
@@ -986,6 +995,7 @@ dependencies = [
 [[package]]
 name = "mesut-tokio"
 version = "0.1.0"
+source = "git+https://github.com/elci-group/mesut?rev=5397efdd0a1621ad0177461af0732a4fa21975d4#5397efdd0a1621ad0177461af0732a4fa21975d4"
 dependencies = [
  "async-trait",
  "mesut-core",
