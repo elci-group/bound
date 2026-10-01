@@ -181,6 +181,40 @@ impl From<serde_json::Error> for BundleError {
     }
 }
 
+/// Keep the first `limit` whitespace-separated tokens of `content`, leaving
+/// the original line breaks and indentation intact.
+fn truncate_tokens(content: &str, limit: usize) -> String {
+    if limit == 0 {
+        return String::new();
+    }
+    let mut seen = 0;
+    let mut in_token = false;
+    for (idx, ch) in content.char_indices() {
+        if ch.is_whitespace() {
+            if in_token && seen == limit {
+                return content[..idx].to_string();
+            }
+            in_token = false;
+        } else if !in_token {
+            in_token = true;
+            seen += 1;
+        }
+    }
+    content.to_string()
+}
+
+/// Largest char boundary in `content` at or below `index`.
+fn floor_char_boundary(content: &str, index: usize) -> usize {
+    if index >= content.len() {
+        return content.len();
+    }
+    let mut end = index;
+    while !content.is_char_boundary(end) {
+        end -= 1;
+    }
+    end
+}
+
 fn parse_filter(filter: Option<&str>) -> Result<(Option<String>, bool), BundleError> {
     match filter {
         None => Ok((None, false)),
@@ -383,16 +417,10 @@ fn bundle_with_loader(
                 }
             }
             if let Some(tl) = options.token_limit {
-                processed_content = processed_content
-                    .split_whitespace()
-                    .take(tl)
-                    .collect::<Vec<&str>>()
-                    .join(" ");
+                processed_content = truncate_tokens(&processed_content, tl);
             }
             if let Some(sl) = options.size_limit {
-                if processed_content.len() > sl {
-                    processed_content.truncate(sl);
-                }
+                processed_content.truncate(floor_char_boundary(&processed_content, sl));
             }
 
             let furnace_report = if options.include_furnace {
