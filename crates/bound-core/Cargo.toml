@@ -19,7 +19,7 @@ sha2 = "0.10"
 # advance either. For local development against a sibling checkout, create
 # a gitignored `.cargo/config.toml` with:
 # paths = ["../../../3form", "../../../mesut"]
-form3 = { git = "https://github.com/elci-group/form3", rev = "0a3d331a771a1eb6266839c701ee213a44e5f514" }
+form3 = { git = "https://github.com/elci-group/3form", rev = "0a3d331a771a1eb6266839c701ee213a44e5f514" }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
 csv = "1.3"
